@@ -69,6 +69,8 @@ namespace Sandbox.Game.Entities.Blocks
 
         private bool m_keepProjection = false;
 
+        private bool m_onlyCanBuildBlock = false;
+
         public MyPowerReceiver PowerReceiver
         {
             get;
@@ -119,6 +121,17 @@ namespace Sandbox.Game.Entities.Blocks
             keepProjectionToggle.EnableAction();
             keepProjectionToggle.Enabled = (b) => b.IsProjecting();
             MyTerminalControlFactory.AddControl(keepProjectionToggle);
+
+            //OnlyCanBuildBlock
+            var onlyCanBuildBlockToggle = new MyTerminalControlCheckbox<MyProjector>("OnlyCanBuildBlock", MySpaceTexts.OnlyCanBuildBlockToggle, MySpaceTexts.OnlyCanBuildBlockTooltip);
+            onlyCanBuildBlockToggle.Getter = (x) => x.m_onlyCanBuildBlock;
+            onlyCanBuildBlockToggle.Setter = (x, v) =>
+            {
+                x.m_onlyCanBuildBlock = v;
+                x.OnOffsetsChanged();
+            };
+            onlyCanBuildBlockToggle.Enabled = (b) => b.IsProjecting();
+            MyTerminalControlFactory.AddControl(onlyCanBuildBlockToggle);
             //Position
 
             var offsetX = new MyTerminalControlSlider<MyProjector>("X", MySpaceTexts.BlockPropertyTitle_ProjectionOffsetX, MySpaceTexts.Blank);
@@ -244,7 +257,7 @@ namespace Sandbox.Game.Entities.Blocks
         {
             m_shouldUpdateProjection = true;
             m_shouldUpdateTexts = true;
-            SyncObject.SendNewOffset(m_projectionOffset, m_projectionRotation);
+            SyncObject.SendNewOffset(m_projectionOffset, m_projectionRotation, m_onlyCanBuildBlock);
 
             //We need to remap because the after the movement, blocks that were already built can be built again
             SyncObject.SendRemap();
@@ -797,7 +810,15 @@ namespace Sandbox.Game.Entities.Blocks
                     }
                     else
                     {
-                        m_visibleBlocks.Add(projectedBlock);
+                        if(m_onlyCanBuildBlock)
+                        {
+                            m_hiddenBlocks.Add(projectedBlock);
+                        }
+                        else
+                        {
+                            m_visibleBlocks.Add(projectedBlock);
+                        }
+                     
                     }
                 }
             }
@@ -1098,12 +1119,13 @@ namespace Sandbox.Game.Entities.Blocks
             InitializeClipboard();
         }
 
-        internal void SetNewOffset(Vector3I positionOffset, Vector3I rotationOffset)
+        internal void SetNewOffset(Vector3I positionOffset, Vector3I rotationOffset,bool onlyCanBuildBlock)
         {
             m_clipboard.ResetGridOrientation();
 
             m_projectionOffset = positionOffset;
             m_projectionRotation = rotationOffset;
+            m_onlyCanBuildBlock = onlyCanBuildBlock;
 
             SetRotation(m_projectionRotation);
         }
@@ -1142,6 +1164,7 @@ namespace Sandbox.Game.Entities.Blocks
 
                 public Vector3I PositionOffset;
                 public Vector3I RotationOffset;
+                public Byte onlyCanBuildBlock;
             }
 
             [MessageIdAttribute(7603, SteamSDK.P2PMessageEnum.Reliable)]
@@ -1252,13 +1275,13 @@ namespace Sandbox.Game.Entities.Blocks
                 }
             }
 
-            public void SendNewOffset(Vector3I positionOffset, Vector3I rotationOffset)
+            public void SendNewOffset(Vector3I positionOffset, Vector3I rotationOffset,bool onlyCanBuildBlock)
             {
                 var msg = new OffsetMsg();
                 msg.EntityId = m_projector.EntityId;
                 msg.PositionOffset = positionOffset;
                 msg.RotationOffset = rotationOffset;
-
+                msg.onlyCanBuildBlock = (byte)(onlyCanBuildBlock ? 1 : 0);
                 if (Sync.IsServer)
                 {
                     Sync.Layer.SendMessageToAllAndSelf(ref msg, MyTransportMessageEnum.Success);
@@ -1281,7 +1304,7 @@ namespace Sandbox.Game.Entities.Blocks
                 var projector = projectorEntity as MyProjector;
                 if (projector != null)
                 {
-                    projector.SetNewOffset(msg.PositionOffset, msg.RotationOffset);
+                    projector.SetNewOffset(msg.PositionOffset, msg.RotationOffset,msg.onlyCanBuildBlock ==1);
                     projector.m_shouldUpdateProjection = true;
                 }
             }
