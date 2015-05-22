@@ -333,8 +333,6 @@ namespace Sandbox.Game.Screens.Helpers
             {
                 if (m_items[i] != null)
                 {
-
-                    //This is only for compatibility with old save. Item and Index slots will be empty for new toolbar item types
                     MyObjectBuilder_ToolbarItem slotObjectBuilder = m_items[i].GetObjectBuilder();
                     var data = m_items[i].GetObjectBuilder();
                     if (data != null)
@@ -342,7 +340,7 @@ namespace Sandbox.Game.Screens.Helpers
                         objectBuilder.Slots.Add(new MyObjectBuilder_Toolbar.Slot()
                         {
                             Index = i,
-                            Item = "",
+                            Item = "", // "Item" field is only for backwards compatibility, new items serialize into "Data"
                             Data = data
                         });
                     }
